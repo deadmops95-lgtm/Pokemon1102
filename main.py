@@ -55,28 +55,17 @@ def init_db():
     )
     """)
     
+    # Исправлено: заполнено корректно через INSERT INTO
     cursor.execute("SELECT COUNT(*) FROM gyms")
     if cursor.fetchone()[0] == 0:
         cursor.execute("INSERT INTO gyms VALUES (1, 'Стадион Канто (Огонь)', NULL, 'Вакантно', '-')")
-        cursor.execute("INSERT INT gyms VALUES (2, 'Стадион Джото (Вода)', NULL, 'Вакантно', '-')") # Опечатка исправлена ниже в чистом коде
+        cursor.execute("INSERT INTO gyms VALUES (2, 'Стадион Джото (Вода)', NULL, 'Вакантно', '-')")
         cursor.execute("INSERT INTO gyms VALUES (3, 'Стадион Хоэнн (Трава)', NULL, 'Вакантно', '-')")
         
     conn.commit()
     conn.close()
 
-# Исправленная инициализация стадионов без опечатки
-def fix_gyms():
-    conn = sqlite3.connect("pokemon_bot.db")
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM gyms")
-    cursor.execute("INSERT OR REPLACE INTO gyms VALUES (1, 'Стадион Канто (Огонь)', NULL, 'Вакантно', '-')")
-    cursor.execute("INSERT OR REPLACE INTO gyms VALUES (2, 'Стадион Джото (Вода)', NULL, 'Вакантно', '-')")
-    cursor.execute("INSERT OR REPLACE INTO gyms VALUES (3, 'Стадион Хоэнн (Трава)', NULL, 'Вакантно', '-')")
-    conn.commit()
-    conn.close()
-
 init_db()
-fix_gyms()
 
 def is_admin(user_username: str) -> bool:
     if not user_username:
@@ -410,7 +399,7 @@ async def daily_bonus(message: types.Message):
     
     await message.answer("🎉 Вы получили ежедневный бонус:\n🪙 **+100 монет**\n🔴 **+3 покебола**!")
 
-# --- НОВОЕ: ЛОТЕРЕЯ (КОЛЕСО УДАЧИ) ---
+# --- ЛОТЕРЕЯ (КОЛЕСО УДАЧИ) ---
 @dp.message(F.text == "🎰 Лотерея")
 async def lottery(message: types.Message):
     user_id = message.from_user.id
@@ -427,7 +416,6 @@ async def lottery(message: types.Message):
         
     cursor.execute("UPDATE users SET last_lottery = ? WHERE user_id = ?", (today, user_id))
     
-    # Шансы выигрыша
     reward_type = random.choices(["coins", "pokeballs", "nothing"], weights=[50, 40, 10], k=1)[0]
     
     if reward_type == "coins":
@@ -439,34 +427,31 @@ async def lottery(message: types.Message):
         cursor.execute("UPDATE users SET pokeballs = pokeballs + ? WHERE user_id = ?", (prize, user_id))
         text = f"🎰 Удача! Вы выиграли **{prize} покебола**! 🔴"
     else:
-        text = "🎰 Эх, барабан остановился на пустом секторе. В следующий повезет больше!"
+        text = "🎰 Эх, барабан остановился на пустом секторе. В следующий раз повезет!"
         
     conn.commit()
     conn.close()
     await message.answer(text)
 
-# --- НОВОЕ: PVP ДУЭЛЬ ---
+# --- PVP ДУЭЛЬ ---
 @dp.message(F.text == "⚔️ PvP Дуэль")
 async def pvp_duel(message: types.Message):
     user_id = message.from_user.id
     conn = sqlite3.connect("pokemon_bot.db")
     cursor = conn.cursor()
     
-    # Проверяем покемонов игрока
     cursor.execute("SELECT pokemon_name, level FROM user_pokemons WHERE user_id = ? ORDER BY level DESC LIMIT 1", (user_id,))
     my_poke = cursor.fetchone()
     if not my_poke:
         conn.close()
         return await message.answer("У вас нет покемонов для дуэли! Сначала поймайте их на карте.")
         
-    # Ищем случайного противника в базе (другого игрока или бота-соперника)
     cursor.execute("SELECT username FROM users WHERE user_id != ? ORDER BY RANDOM() LIMIT 1", (user_id,))
     rival = cursor.fetchone()
     rival_name = rival[0] if rival and rival[0] else "Элитный тренер"
     
     conn.close()
     
-    # Имитация битвы на основе уровней
     win = random.choice([True, False])
     conn = sqlite3.connect("pokemon_bot.db")
     cursor = conn.cursor()
